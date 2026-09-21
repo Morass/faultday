@@ -49,4 +49,32 @@ final class HistoryTests: XCTestCase {
         XCTAssertEqual(sources.reports.count, 1)
         XCTAssertNil(sources.installs)
     }
+
+    func testHourlyBucketsUseLocalCalendarDayAndSeparateKinds() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 2 * 3600)!
+        let day = calendar.date(from: DateComponents(year: 2026, month: 9, day: 18))!
+        let crash = HistoryEvent(id: "a", date: calendar.date(byAdding: .hour, value: 10, to: day)!, kind: .crash,
+                                 title: "Example", detail: "", source: "")
+        let install = HistoryEvent(id: "b", date: calendar.date(byAdding: .hour, value: 10, to: day)!, kind: .install,
+                                   title: "Example", detail: "", source: "")
+        let nextDay = HistoryEvent(id: "c", date: calendar.date(byAdding: .day, value: 1, to: day)!, kind: .crash,
+                                   title: "Example", detail: "", source: "")
+        let buckets = HistorySeries.hourly([crash, install, nextDay], on: day, calendar: calendar)
+        XCTAssertEqual(buckets.count, 24)
+        XCTAssertEqual(buckets[10], HourlyCount(hour: 10, crashes: 1, installs: 1))
+        XCTAssertEqual(buckets.reduce(0) { $0 + $1.total }, 2)
+        XCTAssertEqual(HistorySeries.matching([crash, install, nextDay], kinds: [.crash], day: day, hour: 10, calendar: calendar).map(\.id), ["a"])
+        XCTAssertTrue(HistorySeries.matching([crash, install, nextDay], kinds: [.install], day: day, hour: 11, calendar: calendar).isEmpty)
+    }
+
+    func testDemoSpansHoursAndDaysWithoutExternalSources() {
+        let result = HistorySeries.demo()
+        XCTAssertTrue(result.sources.isEmpty)
+        XCTAssertTrue(result.warnings.isEmpty)
+        XCTAssertTrue(result.events.contains { $0.kind == .crash })
+        XCTAssertTrue(result.events.contains { $0.kind == .install })
+        XCTAssertGreaterThan(Set(result.events.map { Calendar.current.startOfDay(for: $0.date) }).count, 2)
+        XCTAssertGreaterThan(HistorySeries.hourly(result.events, on: result.events[0].date).filter { $0.total > 0 }.count, 2)
+    }
 }

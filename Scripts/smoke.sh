@@ -21,13 +21,17 @@ python3 - "$work/render.png" <<'PY'
 from PIL import Image
 import sys
 im=Image.open(sys.argv[1]).convert('RGB')
-assert im.size[0]>=790 and im.size[1]>=560
+assert im.size[0]>=1000 and im.size[1]>=680
 colors=im.resize((60,40)).getcolors(2400)
 assert colors is not None and len(colors)>25, 'render appears blank'
-right=im.crop((355,0,im.width,im.height))
+right=im.crop((338,0,im.width,im.height))
 pixels=list(right.resize((200,200)).getdata())
-assert sum(1 for r,g,b in pixels if r<100 and g<100 and b<100)>20, 'event pane has no text'
-assert sum(1 for r,g,b in pixels if r>180 and g>180 and b>180)>20000, 'event pane has no background'
+assert sum(1 for r,g,b in pixels if r>170 and g>170 and b>170)>50, 'event pane has no text'
+assert sum(1 for r,g,b in pixels if r<70 and g<85 and b<100)>20000, 'dark background missing'
+chart=im.crop((360,160,im.width-15,325))
+chartpixels=list(chart.getdata())
+assert sum(1 for r,g,b in chartpixels if r>170 and r>g*1.4 and r>b*1.2)>80, 'crash graph missing'
+assert sum(1 for r,g,b in chartpixels if b>130 and b>r*1.3 and b>g)>40, 'install graph missing'
 PY
 "$binary" --help | rg -q 'Usage: open Faultday.app'
 mkdir "$work/empty"

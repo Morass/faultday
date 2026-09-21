@@ -23,6 +23,70 @@ public struct HistoryResult {
     public let events: [HistoryEvent]
     public let warnings: [String]
     public let sources: [String]
+
+    public init(events: [HistoryEvent], warnings: [String], sources: [String]) {
+        self.events = events
+        self.warnings = warnings
+        self.sources = sources
+    }
+}
+
+public struct HourlyCount: Equatable {
+    public let hour: Int
+    public let crashes: Int
+    public let installs: Int
+
+    public var total: Int { crashes + installs }
+}
+
+public enum HistorySeries {
+    public static func matching(_ events: [HistoryEvent], kinds: Set<EventKind>, day: Date?, hour: Int?, calendar: Calendar = .current) -> [HistoryEvent] {
+        events.filter { event in
+            guard kinds.contains(event.kind) else { return false }
+            if let day, !calendar.isDate(event.date, inSameDayAs: day) { return false }
+            if let hour, calendar.component(.hour, from: event.date) != hour { return false }
+            return true
+        }
+    }
+
+    public static func hourly(_ events: [HistoryEvent], on day: Date, calendar: Calendar = .current) -> [HourlyCount] {
+        var crashes = Array(repeating: 0, count: 24)
+        var installs = Array(repeating: 0, count: 24)
+        for event in events where calendar.isDate(event.date, inSameDayAs: day) {
+            let hour = calendar.component(.hour, from: event.date)
+            guard (0..<24).contains(hour) else { continue }
+            switch event.kind {
+            case .crash: crashes[hour] += 1
+            case .install: installs[hour] += 1
+            }
+        }
+        return (0..<24).map { HourlyCount(hour: $0, crashes: crashes[$0], installs: installs[$0]) }
+    }
+
+    public static func demo(now: Date = .now, calendar: Calendar = .current) -> HistoryResult {
+        let examples: [(Int, Int, EventKind, String, String)] = [
+            (0, 9, .install, "Photo Editor", "Software installed · version 4.2"),
+            (0, 10, .crash, "CanvasBoard", "App crash · version 3.4"),
+            (0, 10, .crash, "CanvasBoard", "App crash · version 3.4"),
+            (0, 14, .crash, "Video Viewer", "App crash · version 2.1"),
+            (0, 17, .install, "Graphics Update", "Software installed · version 4.3"),
+            (0, 18, .crash, "CanvasBoard", "App crash · version 3.4"),
+            (-1, 11, .install, "System Update", "Software installed · version 26.6"),
+            (-2, 16, .crash, "Video Viewer", "App crash · version 2.1"),
+            (-4, 8, .crash, "CanvasBoard", "App crash · version 3.3"),
+            (-6, 13, .install, "Photo Editor", "Software installed · version 4.1"),
+            (-8, 20, .crash, "NotePad", "App crash · version 1.8"),
+            (-10, 9, .install, "System Update", "Software installed · version 26.5")
+        ]
+        let today = calendar.startOfDay(for: now)
+        let events = examples.enumerated().compactMap { index, item -> HistoryEvent? in
+            guard let day = calendar.date(byAdding: .day, value: item.0, to: today),
+                  let date = calendar.date(byAdding: .hour, value: item.1, to: day) else { return nil }
+            return HistoryEvent(id: "demo:\(index)", date: date, kind: item.2, title: item.3,
+                                detail: item.4, source: "Example record")
+        }.sorted { $0.date > $1.date }
+        return HistoryResult(events: events, warnings: [], sources: [])
+    }
 }
 
 public enum HistoryReader {

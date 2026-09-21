@@ -15,11 +15,13 @@ cd faultday
 cp -R build/Faultday.app /Applications/
 ```
 
-Open **Faultday** from Applications. The app reads existing local records when it opens; use **Refresh** to read them again.
+Open **Faultday** from Applications. The app reads existing local records when it opens; use **Refresh** to read them again. It starts in dark mode; the **Appearance** menu also offers Light and System.
 
 ## Use
 
-- Pick a date in the calendar to see its events. Red dots are crashes; blue dots are installations.
+- Pick a date in the calendar to see its events and a 24-hour activity graph. Red marks are crashes; blue marks are installations.
+- Click an hour in the graph to see only events from that hour. Click it again to clear the hour filter.
+- Select **Try demo data** to explore a labelled example timeline without reading your records; **View my Mac** returns to your history.
 - Use **Crashes** and **Installs** to filter the list.
 - Choose **All days** to return to the full list. Use the month arrows to browse older records.
 - An installation near a crash is a clue to investigate, not proof that the installation caused it.
