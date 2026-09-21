@@ -26,12 +26,22 @@ public struct HistoryResult {
 }
 
 public enum HistoryReader {
+    private enum ParseError: Error { case malformed }
+
     public static func scan(reports: [URL], installHistory: URL?) -> HistoryResult {
         var events = [HistoryEvent]()
         var warnings = [String]()
         var sources = [String]()
         var seen = Set<String>()
-        for directory in reports {
+        var malformedCount = 0
+        var directories = [URL]()
+        for root in reports {
+            directories.append(root)
+            let retired = root.appendingPathComponent("Retired", isDirectory: true)
+            if let values = try? retired.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]),
+               values.isDirectory == true, values.isSymbolicLink != true { directories.append(retired) }
+        }
+        for directory in directories {
             guard let entries = try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey], options: [.skipsHiddenFiles]) else {
                 warnings.append("Could not read crash reports at \(directory.path)")
                 continue
@@ -42,9 +52,12 @@ public enum HistoryReader {
                 do {
                     if let event = try parseIPS(file), seen.insert(event.id).inserted { events.append(event) }
                 } catch {
-                    warnings.append("Could not read one crash report")
+                    malformedCount += 1
                 }
             }
+        }
+        if malformedCount > 0 {
+            warnings.append("Skipped \(malformedCount) unreadable or incomplete crash report\(malformedCount == 1 ? "" : "s")")
         }
         if let installHistory {
             do {
@@ -63,13 +76,13 @@ public enum HistoryReader {
         let handle = try FileHandle(forReadingFrom: url)
         defer { try? handle.close() }
         let data = try handle.read(upToCount: 16384) ?? Data()
-        guard let newline = data.firstIndex(of: 10), newline < 8192 else { return nil }
+        guard let newline = data.firstIndex(of: 10), newline < 8192 else { throw ParseError.malformed }
         let header = Data(data[..<newline])
         guard let object = try JSONSerialization.jsonObject(with: header) as? [String: Any],
-              let timestamp = object["timestamp"] as? String,
-              let date = parseDate(timestamp),
-              let bugType = object["bug_type"] as? String,
-              bugType == "309" else { return nil }
+              let bugType = object["bug_type"] as? String else { throw ParseError.malformed }
+        guard bugType == "309" else { return nil }
+        guard let timestamp = object["timestamp"] as? String,
+              let date = parseDate(timestamp) else { throw ParseError.malformed }
         let name = safeText((object["app_name"] as? String) ?? (object["name"] as? String) ?? "Unknown app")
         let id = (object["incident_id"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? url.lastPathComponent
         let version = safeText(object["app_version"] as? String ?? "")

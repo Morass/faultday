@@ -30,6 +30,20 @@ final class HistoryTests: XCTestCase {
         XCTAssertNil(try HistoryReader.parseIPS(ips))
     }
 
+
+    func testRetiredReportsAndIncompleteReportWarning() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let retired = dir.appendingPathComponent("Retired")
+        try FileManager.default.createDirectory(at: retired, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let old = retired.appendingPathComponent("old.ips")
+        try "{\"app_name\":\"OldApp\",\"timestamp\":\"2025-09-18 12:32:12.00 +0200\",\"bug_type\":\"309\",\"incident_id\":\"old-1\"}\n{}".write(to: old, atomically: true, encoding: .utf8)
+        try Data().write(to: dir.appendingPathComponent("incomplete.ips"))
+        let result = HistoryReader.scan(reports: [dir], installHistory: nil)
+        XCTAssertEqual(result.events.count, 1)
+        XCTAssertEqual(result.events[0].title, "OldApp")
+        XCTAssertTrue(result.warnings.contains { $0.contains("Skipped 1 unreadable or incomplete crash report") })
+    }
     func testFixtureSwitchDoesNotReadLiveSources() {
         let sources = HistoryReader.defaultSources(environment: ["FAULTDAY_REPORTS_DIR": "/tmp/example"])
         XCTAssertEqual(sources.reports.count, 1)
