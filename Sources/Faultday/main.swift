@@ -11,6 +11,7 @@ struct FaultdayApp: App {
             Foundation.exit(0)
         }
         if ProcessInfo.processInfo.environment["FAULTDAY_SELFTEST"] == "render" {
+            NSApplication.shared.appearance = NSAppearance(named: .aqua)
             let source = HistoryReader.defaultSources()
             let result = HistoryReader.scan(reports: source.reports, installHistory: source.installs)
             let view = NSHostingView(rootView: HistoryView(history: result, refresh: {}).frame(width: 920, height: 620))
@@ -155,6 +156,7 @@ struct HistoryView: View {
                 }
             }
         }
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private func dayCell(_ day: Date) -> some View {

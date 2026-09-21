@@ -24,6 +24,10 @@ im=Image.open(sys.argv[1]).convert('RGB')
 assert im.size[0]>=790 and im.size[1]>=560
 colors=im.resize((60,40)).getcolors(2400)
 assert colors is not None and len(colors)>25, 'render appears blank'
+right=im.crop((355,0,im.width,im.height))
+pixels=list(right.resize((200,200)).getdata())
+assert sum(1 for r,g,b in pixels if r<100 and g<100 and b<100)>20, 'event pane has no text'
+assert sum(1 for r,g,b in pixels if r>180 and g>180 and b>180)>20000, 'event pane has no background'
 PY
 "$binary" --help | rg -q 'Usage: open Faultday.app'
 mkdir "$work/empty"
