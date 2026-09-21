@@ -43,6 +43,10 @@ public struct HourlyCount: Equatable {
 }
 
 public enum HistorySeries {
+    public static func emptyStateMessage(kinds: Set<EventKind>) -> String {
+        kinds.isEmpty ? "Enable Crashes or Installs to see events." : "Choose another day or clear the hour filter."
+    }
+
     public static func matching(_ events: [HistoryEvent], kinds: Set<EventKind>, day: Date?, hour: Int?, calendar: Calendar = .current) -> [HistoryEvent] {
         events.filter { event in
             guard kinds.contains(event.kind) else { return false }
@@ -70,7 +74,12 @@ public enum HistorySeries {
 }
 
 public enum HistoryReader {
-    private enum ParseError: Error { case malformed }
+    private enum ParseError: Error { case malformed, tooLarge }
+
+    public static func shouldScanAtLaunch(arguments: [String], environment: [String: String]) -> Bool {
+        if environment["FAULTDAY_SELFTEST"] != nil { return false }
+        return !arguments.dropFirst().contains { ["--help", "help", "--demo"].contains($0) }
+    }
 
     public static func scan(reports: [URL], installHistory: URL?) -> HistoryResult {
         var events = [HistoryEvent]()
@@ -116,6 +125,8 @@ public enum HistoryReader {
                 let installs = try parseInstallHistory(installHistory)
                 events.append(contentsOf: installs)
                 sources.append(installHistory.path)
+            } catch ParseError.tooLarge {
+                warnings.append("Installation history is too large to read")
             } catch {
                 warnings.append("Could not read installation history")
             }
@@ -145,10 +156,11 @@ public enum HistoryReader {
     public static func parseInstallHistory(_ url: URL) throws -> [HistoryEvent] {
         let properties = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
         guard properties.isRegularFile == true, properties.isSymbolicLink != true,
-              let size = properties.fileSize, size <= 32_000_000 else { return [] }
+              let size = properties.fileSize else { throw ParseError.malformed }
+        guard size <= 32_000_000 else { throw ParseError.tooLarge }
         let data = try Data(contentsOf: url, options: .mappedIfSafe)
-        guard data.count <= 32_000_000,
-              let rows = try PropertyListSerialization.propertyList(from: data, format: nil) as? [[String: Any]] else { return [] }
+        guard data.count <= 32_000_000 else { throw ParseError.tooLarge }
+        guard let rows = try PropertyListSerialization.propertyList(from: data, format: nil) as? [[String: Any]] else { throw ParseError.malformed }
         return rows.enumerated().compactMap { index, row in
             guard let date = row["date"] as? Date, let name = row["displayName"] as? String else { return nil }
             let version = safeText(row["displayVersion"] as? String ?? "")

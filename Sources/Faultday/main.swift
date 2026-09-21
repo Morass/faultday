@@ -17,6 +17,9 @@ private final class FaultdayDelegate: NSObject, NSApplicationDelegate {
 struct FaultdayApp: App {
     @NSApplicationDelegateAdaptor(FaultdayDelegate.self) private var appDelegate
     @State private var history: HistoryResult = {
+        guard HistoryReader.shouldScanAtLaunch(arguments: CommandLine.arguments, environment: ProcessInfo.processInfo.environment) else {
+            return HistoryResult(events: [], warnings: [], sources: [])
+        }
         let source = HistoryReader.defaultSources()
         return HistoryReader.scan(reports: source.reports, installHistory: source.installs)
     }()
@@ -233,7 +236,8 @@ struct HistoryView: View {
                 VStack(spacing: 8) {
                     Image(systemName: "checkmark.circle").font(.largeTitle).foregroundStyle(Palette.mint)
                     Text("No recorded events here").font(.headline)
-                    Text("Choose another day or clear the hour filter.").font(.caption).foregroundStyle(muted)
+                    Text(HistorySeries.emptyStateMessage(kinds: enabledKinds))
+                        .font(.caption).foregroundStyle(muted)
                 }.frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
@@ -393,11 +397,6 @@ struct HistoryView: View {
         if let next = calendar.date(byAdding: .month, value: offset, to: month) { month = next }
     }
 
-    private func resetSelection() {
-        selectedDay = history.events.first?.date
-        selectedHour = nil
-        month = calendar.startOfMonth(for: history.events.first?.date ?? .now)
-    }
 }
 
 private extension Calendar {

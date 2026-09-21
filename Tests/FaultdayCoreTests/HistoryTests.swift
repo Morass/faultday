@@ -57,9 +57,29 @@ final class HistoryTests: XCTestCase {
         let sources = HistoryReader.defaultSources(environment: ["FAULTDAY_REPORTS_DIR": "/tmp/example"])
         XCTAssertEqual(sources.reports.count, 1)
         XCTAssertNil(sources.installs)
+        XCTAssertFalse(HistoryReader.shouldScanAtLaunch(arguments: ["faultday", "--help"], environment: [:]))
+        XCTAssertFalse(HistoryReader.shouldScanAtLaunch(arguments: ["faultday"], environment: ["FAULTDAY_SELFTEST": "render"]))
+        XCTAssertFalse(HistoryReader.shouldScanAtLaunch(arguments: ["faultday", "--demo"], environment: [:]))
+        XCTAssertTrue(HistoryReader.shouldScanAtLaunch(arguments: ["faultday"], environment: [:]))
+    }
+
+    func testOversizeInstallHistoryWarnsInsteadOfSilentlyVanishing() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let plist = dir.appendingPathComponent("large.plist")
+        try Data().write(to: plist)
+        let handle = try FileHandle(forWritingTo: plist)
+        try handle.truncate(atOffset: 32_000_001)
+        try handle.close()
+        let result = HistoryReader.scan(reports: [dir], installHistory: plist)
+        XCTAssertTrue(result.events.isEmpty)
+        XCTAssertTrue(result.warnings.contains("Installation history is too large to read"))
     }
 
     func testHourlyBucketsUseLocalCalendarDayAndSeparateKinds() {
+        XCTAssertEqual(HistorySeries.emptyStateMessage(kinds: []), "Enable Crashes or Installs to see events.")
+        XCTAssertEqual(HistorySeries.emptyStateMessage(kinds: [.crash]), "Choose another day or clear the hour filter.")
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 2 * 3600)!
         let day = calendar.date(from: DateComponents(year: 2026, month: 9, day: 18))!

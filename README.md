@@ -13,7 +13,7 @@ cd faultday
 cp -R build/Faultday.app /Applications/
 ```
 
-Open **Faultday** from Applications. The app reads existing local records when it opens; use **Refresh** to read them again. It starts in dark mode; the **Appearance** menu also offers Light and System.
+Open **Faultday** from Applications. The app reads existing local records when it opens; use **Refresh** to read them again. It starts in dark mode; the **Appearance** setting in the sidebar also offers Light and System.
 
 ## Use
 
