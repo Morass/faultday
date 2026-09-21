@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop stop-color="#22384a"/>
+      <stop offset="1" stop-color="#0b1420"/>
+    </linearGradient>
+    <linearGradient id="pulse" x1="0" x2="1" y1="0" y2="0">
+      <stop stop-color="#55dfaf"/>
+      <stop offset="1" stop-color="#a5f2cf"/>
+    </linearGradient>
+  </defs>
+  <rect x="54" y="54" width="916" height="916" rx="210" fill="#172938"/>
+  <rect x="110" y="110" width="804" height="804" rx="157" fill="none" stroke="#ffffff" stroke-opacity=".09" stroke-width="5"/>
+  <line x1="212" y1="653" x2="307" y2="653" stroke="#64e6ba" stroke-width="57" stroke-linecap="round"/>
+  <line x1="307" y1="653" x2="369" y2="475" stroke="#64e6ba" stroke-width="57" stroke-linecap="round"/>
+  <line x1="369" y1="475" x2="441" y2="730" stroke="#64e6ba" stroke-width="57" stroke-linecap="round"/>
+  <line x1="441" y1="730" x2="518" y2="354" stroke="#64e6ba" stroke-width="57" stroke-linecap="round"/>
+  <line x1="518" y1="354" x2="591" y2="603" stroke="#64e6ba" stroke-width="57" stroke-linecap="round"/>
+  <line x1="591" y1="603" x2="648" y2="502" stroke="#64e6ba" stroke-width="57" stroke-linecap="round"/>
+  <line x1="648" y1="502" x2="710" y2="653" stroke="#64e6ba" stroke-width="57" stroke-linecap="round"/>
+  <line x1="710" y1="653" x2="812" y2="653" stroke="#64e6ba" stroke-width="57" stroke-linecap="round"/>
+  <circle cx="369" cy="475" r="29" fill="#ff6872"/>
+  <circle cx="648" cy="502" r="27" fill="#59adff"/>
+</svg>

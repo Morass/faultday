@@ -3,7 +3,9 @@ set -eu
 cd "$(dirname "$0")/.."
 swift build -c release
 mkdir -p build/Faultday.app/Contents/MacOS
+mkdir -p build/Faultday.app/Contents/Resources
 cp .build/release/faultday build/Faultday.app/Contents/MacOS/faultday
+cp Resources/AppIcon.icns build/Faultday.app/Contents/Resources/AppIcon.icns
 cat > build/Faultday.app/Contents/Info.plist <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -12,6 +14,7 @@ cat > build/Faultday.app/Contents/Info.plist <<'PLIST'
 <key>CFBundleIdentifier</key><string>com.morass.faultday</string>
 <key>CFBundleName</key><string>Faultday</string>
 <key>CFBundleDisplayName</key><string>Faultday</string>
+<key>CFBundleIconFile</key><string>AppIcon</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>0.1.0</string>
 <key>CFBundleVersion</key><string>1</string>
