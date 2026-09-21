@@ -12,10 +12,11 @@ public struct HistoryEvent: Identifiable, Equatable {
     public let title: String
     public let detail: String
     public let source: String
+    public let reportPath: String?
 
-    public init(id: String, date: Date, kind: EventKind, title: String, detail: String, source: String) {
+    public init(id: String, date: Date, kind: EventKind, title: String, detail: String, source: String, reportPath: String? = nil) {
         self.id = id; self.date = date; self.kind = kind; self.title = title
-        self.detail = detail; self.source = source
+        self.detail = detail; self.source = source; self.reportPath = reportPath
     }
 }
 
@@ -23,11 +24,13 @@ public struct HistoryResult {
     public let events: [HistoryEvent]
     public let warnings: [String]
     public let sources: [String]
+    public let otherReports: Int
 
-    public init(events: [HistoryEvent], warnings: [String], sources: [String]) {
+    public init(events: [HistoryEvent], warnings: [String], sources: [String], otherReports: Int = 0) {
         self.events = events
         self.warnings = warnings
         self.sources = sources
+        self.otherReports = otherReports
     }
 }
 
@@ -98,6 +101,7 @@ public enum HistoryReader {
         var sources = [String]()
         var seen = Set<String>()
         var malformedCount = 0
+        var otherReports = 0
         var directories = [URL]()
         for root in reports {
             directories.append(root)
@@ -106,15 +110,22 @@ public enum HistoryReader {
                values.isDirectory == true, values.isSymbolicLink != true { directories.append(retired) }
         }
         for directory in directories {
-            guard let entries = try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey], options: [.skipsHiddenFiles]) else {
+            guard let entries = try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey]) else {
                 warnings.append("Could not read crash reports at \(directory.path)")
                 continue
             }
             sources.append(directory.path)
-            for file in entries where file.pathExtension.lowercased() == "ips" {
+            for file in entries {
                 guard let attrs = try? file.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]), attrs.isRegularFile == true, attrs.isSymbolicLink != true else { continue }
+                let ext = file.pathExtension.lowercased()
+                if ext != "ips" {
+                    if ["panic", "spin", "diag", "dpsub"].contains(ext) { otherReports += 1 }
+                    continue
+                }
                 do {
-                    if let event = try parseIPS(file), seen.insert(event.id).inserted { events.append(event) }
+                    if let event = try parseIPS(file) {
+                        if seen.insert(event.id).inserted { events.append(event) }
+                    } else { otherReports += 1 }
                 } catch {
                     malformedCount += 1
                 }
@@ -133,7 +144,7 @@ public enum HistoryReader {
             }
         }
         events.sort { $0.date > $1.date }
-        return HistoryResult(events: events, warnings: warnings, sources: sources)
+        return HistoryResult(events: events, warnings: warnings, sources: sources, otherReports: otherReports)
     }
 
     public static func parseIPS(_ url: URL) throws -> HistoryEvent? {
@@ -151,7 +162,7 @@ public enum HistoryReader {
         let id = (object["incident_id"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? url.lastPathComponent
         let version = safeText(object["app_version"] as? String ?? "")
         return HistoryEvent(id: "crash:\(id)", date: date, kind: .crash, title: name,
-                            detail: version.isEmpty ? "App crash" : "App crash · version \(version)", source: "Diagnostic report")
+                            detail: version.isEmpty ? "App crash" : "App crash · version \(version)", source: "Diagnostic report", reportPath: url.path)
     }
 
     public static func parseInstallHistory(_ url: URL) throws -> [HistoryEvent] {

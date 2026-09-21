@@ -18,6 +18,8 @@ final class HistoryTests: XCTestCase {
         let result = HistoryReader.scan(reports: [dir], installHistory: plist)
         XCTAssertEqual(result.events.count, 2)
         XCTAssertEqual(Set(result.events.map(\.kind)), Set([.crash, .install]))
+        XCTAssertEqual(result.events.first { $0.kind == .crash }?.reportPath.map { URL(fileURLWithPath: $0).standardizedFileURL.path }, ips.standardizedFileURL.path)
+        XCTAssertNil(result.events.first { $0.kind == .install }?.reportPath)
         XCTAssertTrue(result.warnings.isEmpty)
     }
 
@@ -28,6 +30,13 @@ final class HistoryTests: XCTestCase {
         let ips = dir.appendingPathComponent("sample.ips")
         try "{\"app_name\":\"Bad\\u001bName\",\"timestamp\":\"2026-09-18 12:32:12.00 +0200\",\"bug_type\":\"298\"}\n{}".write(to: ips, atomically: true, encoding: .utf8)
         XCTAssertNil(try HistoryReader.parseIPS(ips))
+        let panic = dir.appendingPathComponent("Kernel_1.panic")
+        try "panic".write(to: panic, atomically: true, encoding: .utf8)
+        let hidden = dir.appendingPathComponent(".WindowServer.ips")
+        try "{\"bug_type\":\"409\"}\n{}".write(to: hidden, atomically: true, encoding: .utf8)
+        let result = HistoryReader.scan(reports: [dir], installHistory: nil)
+        XCTAssertEqual(result.otherReports, 3)
+        XCTAssertTrue(result.events.isEmpty)
     }
 
 
