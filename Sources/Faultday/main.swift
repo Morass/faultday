@@ -1,10 +1,32 @@
 import Foundation
+import AppKit
 import SwiftUI
 import FaultdayCore
 
 @main
 struct FaultdayApp: App {
     init() {
+        if CommandLine.arguments.dropFirst().contains("--help") || CommandLine.arguments.dropFirst().contains("help") {
+            print("Faultday — browse crash and installation history on this Mac\n\nUsage: open Faultday.app\n       faultday --help\n\nReads existing DiagnosticReports and Apple installation history. It does not change them.\nSome app installs, hangs, and restarts are not represented.")
+            Foundation.exit(0)
+        }
+        if ProcessInfo.processInfo.environment["FAULTDAY_SELFTEST"] == "render" {
+            let source = HistoryReader.defaultSources()
+            let result = HistoryReader.scan(reports: source.reports, installHistory: source.installs)
+            let view = NSHostingView(rootView: HistoryView(history: result, refresh: {}).frame(width: 920, height: 620))
+            view.frame = NSRect(x: 0, y: 0, width: 920, height: 620)
+            let window = NSWindow(contentRect: view.frame, styleMask: [.titled], backing: .buffered, defer: false)
+            window.contentView = view
+            window.displayIfNeeded()
+            view.layoutSubtreeIfNeeded()
+            guard let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds),
+                  let path = ProcessInfo.processInfo.environment["FAULTDAY_CAPTURE_PATH"] else { Foundation.exit(2) }
+            view.cacheDisplay(in: view.bounds, to: bitmap)
+            guard let png = bitmap.representation(using: .png, properties: [:]) else { Foundation.exit(2) }
+            do { try png.write(to: URL(fileURLWithPath: path)) } catch { Foundation.exit(2) }
+            print("rendered=\(png.count)")
+            Foundation.exit(png.count > 10000 ? 0 : 2)
+        }
         if ProcessInfo.processInfo.environment["FAULTDAY_SELFTEST"] == "scan" {
             let source = HistoryReader.defaultSources()
             let result = HistoryReader.scan(reports: source.reports, installHistory: source.installs)
@@ -57,7 +79,7 @@ struct HistoryView: View {
             VStack(alignment: .leading, spacing: 20) {
                 VStack(alignment: .leading, spacing: 5) {
                     Text("Faultday").font(.largeTitle.bold())
-                    Text("Your Mac’s reliability history").foregroundStyle(.secondary)
+                    Text("Crash and installation history").foregroundStyle(.secondary)
                 }
                 HStack {
                     Button { month = calendar.date(byAdding: .month, value: -1, to: month)! } label: { Image(systemName: "chevron.left") }
@@ -81,7 +103,7 @@ struct HistoryView: View {
                     Label("Install", systemImage: "square.and.arrow.down.fill").foregroundStyle(.blue)
                 }.font(.caption)
                 Spacer()
-                Text("Events come from records already on this Mac. Nearby events do not prove a cause.")
+                Text("Crash reports and Apple installer records only. Some apps and restarts are absent. Nearby events do not prove a cause.")
                     .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             .padding(24).frame(width: 355).background(Color(nsColor: .controlBackgroundColor))
@@ -108,7 +130,9 @@ struct HistoryView: View {
                                            description: Text("Only readable crash reports and installation records appear here."))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    List(displayed) { event in
+                    ScrollView {
+                      LazyVStack(alignment: .leading, spacing: 0) {
+                       ForEach(displayed) { event in
                         HStack(alignment: .top, spacing: 12) {
                             Image(systemName: event.kind == .crash ? "xmark.circle.fill" : "square.and.arrow.down.fill")
                                 .foregroundStyle(event.kind == .crash ? .red : .blue)
@@ -119,8 +143,11 @@ struct HistoryView: View {
                                 Text("\(event.date.formatted(date: .abbreviated, time: .shortened)) · \(event.source)")
                                     .font(.caption).foregroundStyle(.tertiary)
                             }
-                        }.padding(.vertical, 6)
-                    }.listStyle(.plain)
+                        }.padding(.vertical, 11).padding(.horizontal, 20)
+                        Divider().padding(.leading, 52)
+                       }
+                      }
+                    }
                 }
                 if !history.warnings.isEmpty {
                     Text(history.warnings.joined(separator: " · ")).font(.caption).foregroundStyle(.orange)

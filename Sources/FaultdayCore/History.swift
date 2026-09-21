@@ -78,6 +78,9 @@ public enum HistoryReader {
     }
 
     public static func parseInstallHistory(_ url: URL) throws -> [HistoryEvent] {
+        let properties = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
+        guard properties.isRegularFile == true, properties.isSymbolicLink != true,
+              let size = properties.fileSize, size <= 32_000_000 else { return [] }
         let data = try Data(contentsOf: url, options: .mappedIfSafe)
         guard data.count <= 32_000_000,
               let rows = try PropertyListSerialization.propertyList(from: data, format: nil) as? [[String: Any]] else { return [] }
