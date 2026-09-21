@@ -9,8 +9,13 @@ private enum Palette {
     static let mint = Color(red: 0.35, green: 0.86, blue: 0.69)
 }
 
+private final class FaultdayDelegate: NSObject, NSApplicationDelegate {
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+}
+
 @main
 struct FaultdayApp: App {
+    @NSApplicationDelegateAdaptor(FaultdayDelegate.self) private var appDelegate
     @State private var history: HistoryResult = {
         let source = HistoryReader.defaultSources()
         return HistoryReader.scan(reports: source.reports, installHistory: source.installs)
