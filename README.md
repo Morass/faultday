@@ -2,8 +2,6 @@
 
 Faultday shows your Mac's crash reports and Apple installation history on a calendar. Pick a day to see which apps crashed and which software was installed around then.
 
-![Faultday showing labelled sample events in a dark calendar and activity graph](docs/screenshot.png)
-
 ## Install
 
 Requires macOS 14 or later and Swift 5.9 or later to build from source.
@@ -21,7 +19,6 @@ Open **Faultday** from Applications. The app reads existing local records when i
 
 - Pick a date in the calendar to see its events and a 24-hour activity graph. Red marks are crashes; blue marks are installations.
 - Click an hour in the graph to see only events from that hour. Click it again to clear the hour filter.
-- Select **Explore sample timeline** to see made-up events and try the graphs. It shows no records from your Mac; **View my Mac** returns to your history.
 - Click a crash in the event list to open its original report in your Mac's default viewer.
 - Use **Crashes** and **Installs** to filter the list.
 - Choose **All days** to return to the full list. Use the month arrows to browse older records.

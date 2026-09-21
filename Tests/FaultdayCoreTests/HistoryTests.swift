@@ -77,13 +77,5 @@ final class HistoryTests: XCTestCase {
         XCTAssertTrue(HistorySeries.matching([crash, install, nextDay], kinds: [.install], day: day, hour: 11, calendar: calendar).isEmpty)
     }
 
-    func testDemoSpansHoursAndDaysWithoutExternalSources() {
-        let result = HistorySeries.demo()
-        XCTAssertTrue(result.sources.isEmpty)
-        XCTAssertTrue(result.warnings.isEmpty)
-        XCTAssertTrue(result.events.contains { $0.kind == .crash })
-        XCTAssertTrue(result.events.contains { $0.kind == .install })
-        XCTAssertGreaterThan(Set(result.events.map { Calendar.current.startOfDay(for: $0.date) }).count, 2)
-        XCTAssertGreaterThan(HistorySeries.hourly(result.events, on: result.events[0].date).filter { $0.total > 0 }.count, 2)
-    }
+
 }

@@ -11,30 +11,27 @@ private enum Palette {
 
 @main
 struct FaultdayApp: App {
-    @State private var demo = CommandLine.arguments.contains("--demo")
     @State private var history: HistoryResult = {
-        if CommandLine.arguments.contains("--demo") { return HistorySeries.demo() }
         let source = HistoryReader.defaultSources()
         return HistoryReader.scan(reports: source.reports, installHistory: source.installs)
     }()
 
     init() {
         if CommandLine.arguments.dropFirst().contains("--help") || CommandLine.arguments.dropFirst().contains("help") {
-            print("Faultday — browse crash and installation history on this Mac\n\nUsage: open Faultday.app\n       open -n Faultday.app --args --demo\n       faultday --help\n\nReads existing DiagnosticReports and Apple installation history. It does not change them.\nSome app installs, hangs, and restarts are not represented.")
+            print("Faultday — browse crash and installation history on this Mac\n\nUsage: open Faultday.app\n       faultday --help\n\nReads existing DiagnosticReports and Apple installation history. It does not change them.\nSome app installs, hangs, and restarts are not represented.")
             Foundation.exit(0)
+        }
+        if CommandLine.arguments.dropFirst().contains("--demo") {
+            fputs("Faultday no longer includes a sample-data mode.\n", stderr)
+            Foundation.exit(2)
         }
         if ProcessInfo.processInfo.environment["FAULTDAY_SELFTEST"] == "render" {
             let captureScheme = ProcessInfo.processInfo.environment["FAULTDAY_CAPTURE_SCHEME"] == "light" ? "light" : "dark"
             NSApplication.shared.appearance = NSAppearance(named: captureScheme == "light" ? .aqua : .darkAqua)
-            let isDemo = ProcessInfo.processInfo.environment["FAULTDAY_REPORTS_DIR"] == nil
-            let result: HistoryResult
-            if isDemo {
-                result = HistorySeries.demo()
-            } else {
-                let source = HistoryReader.defaultSources()
-                result = HistoryReader.scan(reports: source.reports, installHistory: source.installs)
-            }
-            let view = NSHostingView(rootView: HistoryView(history: result, demo: isDemo, appearanceOverride: captureScheme, refresh: {}, toggleDemo: {}).frame(width: 1100, height: 720))
+            guard ProcessInfo.processInfo.environment["FAULTDAY_REPORTS_DIR"] != nil else { Foundation.exit(2) }
+            let source = HistoryReader.defaultSources()
+            let result = HistoryReader.scan(reports: source.reports, installHistory: source.installs)
+            let view = NSHostingView(rootView: HistoryView(history: result, appearanceOverride: captureScheme, refresh: {}).frame(width: 1100, height: 720))
             view.frame = NSRect(x: 0, y: 0, width: 1100, height: 720)
             let window = NSWindow(contentRect: view.frame, styleMask: [.titled], backing: .buffered, defer: false)
             window.contentView = view
@@ -58,18 +55,9 @@ struct FaultdayApp: App {
 
     var body: some Scene {
         WindowGroup("Faultday") {
-            HistoryView(history: history, demo: demo, refresh: {
-                history = demo ? HistorySeries.demo() : {
-                    let source = HistoryReader.defaultSources()
-                    return HistoryReader.scan(reports: source.reports, installHistory: source.installs)
-                }()
-            }, toggleDemo: {
-                demo.toggle()
-                if demo { history = HistorySeries.demo() }
-                else {
-                    let source = HistoryReader.defaultSources()
-                    history = HistoryReader.scan(reports: source.reports, installHistory: source.installs)
-                }
+            HistoryView(history: history, refresh: {
+                let source = HistoryReader.defaultSources()
+                history = HistoryReader.scan(reports: source.reports, installHistory: source.installs)
             })
             .frame(minWidth: 920, minHeight: 650)
         }
@@ -79,10 +67,8 @@ struct FaultdayApp: App {
 
 struct HistoryView: View {
     let history: HistoryResult
-    let demo: Bool
     let appearanceOverride: String?
     let refresh: () -> Void
-    let toggleDemo: () -> Void
     @AppStorage("appearance") private var appearance = "dark"
     @Environment(\.colorScheme) private var colorScheme
     @State private var month: Date
@@ -93,12 +79,10 @@ struct HistoryView: View {
     @State private var reportOpenError = false
     private let calendar = Calendar.current
 
-    init(history: HistoryResult, demo: Bool, appearanceOverride: String? = nil, refresh: @escaping () -> Void, toggleDemo: @escaping () -> Void) {
+    init(history: HistoryResult, appearanceOverride: String? = nil, refresh: @escaping () -> Void) {
         self.history = history
-        self.demo = demo
         self.appearanceOverride = appearanceOverride
         self.refresh = refresh
-        self.toggleDemo = toggleDemo
         let first = history.events.first?.date ?? .now
         _selectedDay = State(initialValue: history.events.first?.date)
         _month = State(initialValue: Calendar.current.startOfMonth(for: first))
@@ -133,7 +117,6 @@ struct HistoryView: View {
         }
         .background(base)
         .preferredColorScheme((appearanceOverride ?? appearance) == "system" ? nil : ((appearanceOverride ?? appearance) == "light" ? .light : .dark))
-        .onChange(of: demo) { _, _ in resetSelection() }
         .alert("Could not open report", isPresented: $reportOpenError) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -173,16 +156,8 @@ struct HistoryView: View {
             }.font(.caption.weight(.medium))
             Spacer(minLength: 8)
             VStack(alignment: .leading, spacing: 11) {
-                Button(demo ? "View my Mac" : "Explore sample timeline", action: toggleDemo)
-                    .buttonStyle(.borderedProminent)
-                    .tint(Palette.install)
-                if demo {
-                    Text("Sample events only. No records from this Mac are shown.")
-                        .font(.caption).foregroundStyle(muted)
-                } else {
-                    Text("\(history.events.filter { $0.kind == .crash }.count) saved app crash reports found. \(history.otherReports) other diagnostic reports are outside this view.")
-                        .font(.caption).foregroundStyle(muted)
-                }
+                Text("\(history.events.filter { $0.kind == .crash }.count) saved app crash reports found. \(history.otherReports) other diagnostic reports are outside this view.")
+                    .font(.caption).foregroundStyle(muted)
                 HStack {
                     Text("Appearance").foregroundStyle(muted)
                     Spacer()
@@ -207,8 +182,6 @@ struct HistoryView: View {
                     HStack(spacing: 9) {
                         Text(selectedDay?.formatted(date: .complete, time: .omitted) ?? "All events")
                             .font(.system(size: 23, weight: .bold, design: .rounded))
-                        if demo { Text("DEMO").font(.caption2.bold()).padding(.horizontal, 7).padding(.vertical, 3)
-                            .background(Palette.install.opacity(0.22)).foregroundStyle(Palette.install).clipShape(Capsule()) }
                     }
                     Text(selectedDay == nil ? "Recent recorded activity" : "Recorded activity through the day")
                         .font(.subheadline).foregroundStyle(muted)
@@ -255,7 +228,7 @@ struct HistoryView: View {
                 VStack(spacing: 8) {
                     Image(systemName: "checkmark.circle").font(.largeTitle).foregroundStyle(Palette.mint)
                     Text("No recorded events here").font(.headline)
-                    Text("Choose another day, clear the hour filter, or try the demo.").font(.caption).foregroundStyle(muted)
+                    Text("Choose another day or clear the hour filter.").font(.caption).foregroundStyle(muted)
                 }.frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {

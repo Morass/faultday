@@ -40,6 +40,14 @@ assert im.getpixel((20,20))[0] < 100, 'dark background missing'
 assert light.getpixel((20,20))[0] > 220, 'light background missing'
 PY
 "$binary" --help | rg -q 'Usage: open Faultday.app'
+if "$binary" --demo >"$work/removed-mode.txt" 2>&1; then
+ echo 'removed sample mode passed unexpectedly' >&2; exit 1
+fi
+rg -q 'no longer includes a sample-data mode' "$work/removed-mode.txt"
+if FAULTDAY_SELFTEST=render FAULTDAY_CAPTURE_PATH="$work/no-fixture.png" "$binary" >/dev/null; then
+ echo 'render without a test fixture passed unexpectedly' >&2; exit 1
+fi
+test ! -e "$work/no-fixture.png"
 mkdir "$work/empty"
 if FAULTDAY_SELFTEST=scan FAULTDAY_REPORTS_DIR="$work/empty" "$binary" >/dev/null; then
  echo 'empty fixture passed unexpectedly' >&2; exit 1

@@ -66,30 +66,7 @@ public enum HistorySeries {
         return (0..<24).map { HourlyCount(hour: $0, crashes: crashes[$0], installs: installs[$0]) }
     }
 
-    public static func demo(now: Date = .now, calendar: Calendar = .current) -> HistoryResult {
-        let examples: [(Int, Int, EventKind, String, String)] = [
-            (0, 9, .install, "Photo Editor", "Software installed · version 4.2"),
-            (0, 10, .crash, "CanvasBoard", "App crash · version 3.4"),
-            (0, 10, .crash, "CanvasBoard", "App crash · version 3.4"),
-            (0, 14, .crash, "Video Viewer", "App crash · version 2.1"),
-            (0, 17, .install, "Graphics Update", "Software installed · version 4.3"),
-            (0, 18, .crash, "CanvasBoard", "App crash · version 3.4"),
-            (-1, 11, .install, "System Update", "Software installed · version 26.6"),
-            (-2, 16, .crash, "Video Viewer", "App crash · version 2.1"),
-            (-4, 8, .crash, "CanvasBoard", "App crash · version 3.3"),
-            (-6, 13, .install, "Photo Editor", "Software installed · version 4.1"),
-            (-8, 20, .crash, "NotePad", "App crash · version 1.8"),
-            (-10, 9, .install, "System Update", "Software installed · version 26.5")
-        ]
-        let today = calendar.startOfDay(for: now)
-        let events = examples.enumerated().compactMap { index, item -> HistoryEvent? in
-            guard let day = calendar.date(byAdding: .day, value: item.0, to: today),
-                  let date = calendar.date(byAdding: .hour, value: item.1, to: day) else { return nil }
-            return HistoryEvent(id: "demo:\(index)", date: date, kind: item.2, title: item.3,
-                                detail: item.4, source: "Example record")
-        }.sorted { $0.date > $1.date }
-        return HistoryResult(events: events, warnings: [], sources: [])
-    }
+
 }
 
 public enum HistoryReader {
