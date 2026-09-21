@@ -24,7 +24,8 @@ struct FaultdayApp: App {
             Foundation.exit(0)
         }
         if ProcessInfo.processInfo.environment["FAULTDAY_SELFTEST"] == "render" {
-            NSApplication.shared.appearance = NSAppearance(named: .darkAqua)
+            let captureScheme = ProcessInfo.processInfo.environment["FAULTDAY_CAPTURE_SCHEME"] == "light" ? "light" : "dark"
+            NSApplication.shared.appearance = NSAppearance(named: captureScheme == "light" ? .aqua : .darkAqua)
             let result: HistoryResult
             if ProcessInfo.processInfo.environment["FAULTDAY_REPORTS_DIR"] == nil {
                 result = HistorySeries.demo()
@@ -32,7 +33,7 @@ struct FaultdayApp: App {
                 let source = HistoryReader.defaultSources()
                 result = HistoryReader.scan(reports: source.reports, installHistory: source.installs)
             }
-            let view = NSHostingView(rootView: HistoryView(history: result, demo: true, refresh: {}, toggleDemo: {}).frame(width: 1100, height: 720))
+            let view = NSHostingView(rootView: HistoryView(history: result, demo: true, appearanceOverride: captureScheme, refresh: {}, toggleDemo: {}).frame(width: 1100, height: 720))
             view.frame = NSRect(x: 0, y: 0, width: 1100, height: 720)
             let window = NSWindow(contentRect: view.frame, styleMask: [.titled], backing: .buffered, defer: false)
             window.contentView = view
@@ -78,6 +79,7 @@ struct FaultdayApp: App {
 struct HistoryView: View {
     let history: HistoryResult
     let demo: Bool
+    let appearanceOverride: String?
     let refresh: () -> Void
     let toggleDemo: () -> Void
     @AppStorage("appearance") private var appearance = "dark"
@@ -89,9 +91,10 @@ struct HistoryView: View {
     @State private var showInstalls = true
     private let calendar = Calendar.current
 
-    init(history: HistoryResult, demo: Bool, refresh: @escaping () -> Void, toggleDemo: @escaping () -> Void) {
+    init(history: HistoryResult, demo: Bool, appearanceOverride: String? = nil, refresh: @escaping () -> Void, toggleDemo: @escaping () -> Void) {
         self.history = history
         self.demo = demo
+        self.appearanceOverride = appearanceOverride
         self.refresh = refresh
         self.toggleDemo = toggleDemo
         let first = history.events.first?.date ?? .now
@@ -130,7 +133,7 @@ struct HistoryView: View {
             content
         }
         .background(base)
-        .preferredColorScheme(appearance == "system" ? nil : (appearance == "light" ? .light : .dark))
+        .preferredColorScheme((appearanceOverride ?? appearance) == "system" ? nil : ((appearanceOverride ?? appearance) == "light" ? .light : .dark))
         .onChange(of: demo) { _, _ in resetSelection() }
         .onChange(of: history.events.count) { _, _ in
             if selectedDay == nil && !history.events.isEmpty { resetSelection() }
