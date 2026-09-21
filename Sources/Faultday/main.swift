@@ -26,14 +26,15 @@ struct FaultdayApp: App {
         if ProcessInfo.processInfo.environment["FAULTDAY_SELFTEST"] == "render" {
             let captureScheme = ProcessInfo.processInfo.environment["FAULTDAY_CAPTURE_SCHEME"] == "light" ? "light" : "dark"
             NSApplication.shared.appearance = NSAppearance(named: captureScheme == "light" ? .aqua : .darkAqua)
+            let isDemo = ProcessInfo.processInfo.environment["FAULTDAY_REPORTS_DIR"] == nil
             let result: HistoryResult
-            if ProcessInfo.processInfo.environment["FAULTDAY_REPORTS_DIR"] == nil {
+            if isDemo {
                 result = HistorySeries.demo()
             } else {
                 let source = HistoryReader.defaultSources()
                 result = HistoryReader.scan(reports: source.reports, installHistory: source.installs)
             }
-            let view = NSHostingView(rootView: HistoryView(history: result, demo: true, appearanceOverride: captureScheme, refresh: {}, toggleDemo: {}).frame(width: 1100, height: 720))
+            let view = NSHostingView(rootView: HistoryView(history: result, demo: isDemo, appearanceOverride: captureScheme, refresh: {}, toggleDemo: {}).frame(width: 1100, height: 720))
             view.frame = NSRect(x: 0, y: 0, width: 1100, height: 720)
             let window = NSWindow(contentRect: view.frame, styleMask: [.titled], backing: .buffered, defer: false)
             window.contentView = view
@@ -50,7 +51,7 @@ struct FaultdayApp: App {
         if ProcessInfo.processInfo.environment["FAULTDAY_SELFTEST"] == "scan" {
             let source = HistoryReader.defaultSources()
             let result = HistoryReader.scan(reports: source.reports, installHistory: source.installs)
-            print("crashes=\(result.events.filter { $0.kind == .crash }.count) installs=\(result.events.filter { $0.kind == .install }.count) warnings=\(result.warnings.count)")
+            print("crashes=\(result.events.filter { $0.kind == .crash }.count) installs=\(result.events.filter { $0.kind == .install }.count) other=\(result.otherReports) warnings=\(result.warnings.count)")
             Foundation.exit(result.events.isEmpty ? 1 : 0)
         }
     }
@@ -89,6 +90,7 @@ struct HistoryView: View {
     @State private var selectedHour: Int? = nil
     @State private var showCrashes = true
     @State private var showInstalls = true
+    @State private var reportOpenError = false
     private let calendar = Calendar.current
 
     init(history: HistoryResult, demo: Bool, appearanceOverride: String? = nil, refresh: @escaping () -> Void, toggleDemo: @escaping () -> Void) {
@@ -111,9 +113,6 @@ struct HistoryView: View {
     private var displayed: [HistoryEvent] {
         HistorySeries.matching(history.events, kinds: enabledKinds, day: selectedDay, hour: selectedHour)
     }
-    private var dayEvents: [HistoryEvent] {
-        HistorySeries.matching(history.events, kinds: enabledKinds, day: selectedDay, hour: nil)
-    }
     private var enabledKinds: Set<EventKind> {
         var kinds = Set<EventKind>()
         if showCrashes { kinds.insert(.crash) }
@@ -135,8 +134,10 @@ struct HistoryView: View {
         .background(base)
         .preferredColorScheme((appearanceOverride ?? appearance) == "system" ? nil : ((appearanceOverride ?? appearance) == "light" ? .light : .dark))
         .onChange(of: demo) { _, _ in resetSelection() }
-        .onChange(of: history.events.count) { _, _ in
-            if selectedDay == nil && !history.events.isEmpty { resetSelection() }
+        .alert("Could not open report", isPresented: $reportOpenError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("The report may have been moved or removed. Refresh and try again.")
         }
     }
 
@@ -172,9 +173,16 @@ struct HistoryView: View {
             }.font(.caption.weight(.medium))
             Spacer(minLength: 8)
             VStack(alignment: .leading, spacing: 11) {
-                Button(demo ? "View my Mac" : "Try demo data", action: toggleDemo)
+                Button(demo ? "View my Mac" : "Explore sample timeline", action: toggleDemo)
                     .buttonStyle(.borderedProminent)
                     .tint(Palette.install)
+                if demo {
+                    Text("Sample events only. No records from this Mac are shown.")
+                        .font(.caption).foregroundStyle(muted)
+                } else {
+                    Text("\(history.events.filter { $0.kind == .crash }.count) saved app crash reports found. \(history.otherReports) other diagnostic reports are outside this view.")
+                        .font(.caption).foregroundStyle(muted)
+                }
                 HStack {
                     Text("Appearance").foregroundStyle(muted)
                     Spacer()
@@ -209,9 +217,9 @@ struct HistoryView: View {
                 Button("Refresh", action: refresh).buttonStyle(.bordered)
             }
             HStack(spacing: 10) {
-                statTile(title: "CRASHES", value: dayEvents.filter { $0.kind == .crash }.count, tint: Palette.crash, icon: "xmark.circle.fill")
-                statTile(title: "INSTALLS", value: dayEvents.filter { $0.kind == .install }.count, tint: Palette.install, icon: "square.and.arrow.down.fill")
-                statTile(title: "EVENTS", value: dayEvents.count, tint: Palette.mint, icon: "chart.bar.fill")
+                statTile(title: "CRASHES", value: displayed.filter { $0.kind == .crash }.count, tint: Palette.crash, icon: "xmark.circle.fill")
+                statTile(title: "INSTALLS", value: displayed.filter { $0.kind == .install }.count, tint: Palette.install, icon: "square.and.arrow.down.fill")
+                statTile(title: "EVENTS", value: displayed.count, tint: Palette.mint, icon: "chart.bar.fill")
             }
             VStack(alignment: .leading, spacing: 11) {
                 HStack {
@@ -347,7 +355,22 @@ struct HistoryView: View {
         }
     }
 
-    private func eventRow(_ event: HistoryEvent) -> some View {
+    @ViewBuilder private func eventRow(_ event: HistoryEvent) -> some View {
+        if let path = event.reportPath {
+            Button {
+                if !NSWorkspace.shared.open(URL(fileURLWithPath: path)) { reportOpenError = true }
+            } label: {
+                eventRowContent(event, openable: true)
+            }
+            .buttonStyle(.plain)
+            .help("Open crash report")
+            .accessibilityLabel("Open crash report for \(event.title)")
+        } else {
+            eventRowContent(event, openable: false)
+        }
+    }
+
+    private func eventRowContent(_ event: HistoryEvent, openable: Bool) -> some View {
         HStack(alignment: .top, spacing: 11) {
             Image(systemName: event.kind == .crash ? "xmark.circle.fill" : "square.and.arrow.down.fill")
                 .foregroundStyle(event.kind == .crash ? Palette.crash : Palette.install)
@@ -362,6 +385,7 @@ struct HistoryView: View {
                 Text(event.detail).font(.caption).foregroundStyle(muted)
                 Text(event.source).font(.caption2).foregroundStyle(muted.opacity(0.8))
             }
+            if openable { Image(systemName: "arrow.up.right.square").foregroundStyle(Palette.install).font(.caption) }
         }.padding(.horizontal, 14).padding(.vertical, 10)
     }
 

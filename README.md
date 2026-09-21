@@ -2,7 +2,7 @@
 
 Faultday shows your Mac's crash reports and Apple installation history on a calendar. Pick a day to see which apps crashed and which software was installed around then.
 
-![Faultday calendar and event list](docs/screenshot.png)
+![Faultday showing labelled sample events in a dark calendar and activity graph](docs/screenshot.png)
 
 ## Install
 
@@ -21,12 +21,13 @@ Open **Faultday** from Applications. The app reads existing local records when i
 
 - Pick a date in the calendar to see its events and a 24-hour activity graph. Red marks are crashes; blue marks are installations.
 - Click an hour in the graph to see only events from that hour. Click it again to clear the hour filter.
-- Select **Try demo data** to explore a labelled example timeline without reading your records; **View my Mac** returns to your history.
+- Select **Explore sample timeline** to see made-up events and try the graphs. It shows no records from your Mac; **View my Mac** returns to your history.
+- Click a crash in the event list to open its original report in your Mac's default viewer.
 - Use **Crashes** and **Installs** to filter the list.
 - Choose **All days** to return to the full list. Use the month arrows to browse older records.
 - An installation near a crash is a clue to investigate, not proof that the installation caused it.
 
-Faultday reads crash reports in `~/Library/Logs/DiagnosticReports` and `/Library/Logs/DiagnosticReports`, plus `/Library/Receipts/InstallHistory.plist`. It does not modify those files, send data over the network, or stay running in the background after you quit.
+Faultday reads crash reports in `~/Library/Logs/DiagnosticReports` and `/Library/Logs/DiagnosticReports`, plus `/Library/Receipts/InstallHistory.plist`. The sidebar shows how many other saved diagnostic files are outside its app-crash view. It does not modify those files, send data over the network, or stay running in the background after you quit.
 
 ## Limits
 
