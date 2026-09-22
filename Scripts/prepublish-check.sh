@@ -45,6 +45,13 @@ mails=$(git grep -nIE '[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-
 # A secret committed and deleted again is still published with the repository, and
 # `git grep` only ever sees the current tree.
 added=$(git log --all -p -U0 --format= -- . | grep -E '^\+' | grep -vE '^\+\+\+')
+pastpaths=$(printf '%s\n' "$added" | grep -nIE '/Users/[A-Za-z][A-Za-z0-9_-]+/|/home/[a-z][a-z0-9_-]+/|(^|[^0-9.v])[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}([^0-9.]|$)' |
+	grep -vE '/Users/(you|u|alice|bob|recorded|nonexistent)/|/home/(u|bob|linuxbrew|secret)/|0\.0\.0\.0|127\.0\.0\.1|192\.0\.2\.|198\.51\.100\.|203\.0\.113\.')
+if [ -s .git/info/private-exceptions ]; then
+	ex=$(grep -v '^[[:space:]]*\(#\|$\)' .git/info/private-exceptions | paste -sd'|' -)
+	[ -n "$ex" ] && pastpaths=$(printf '%s\n' "$pastpaths" | grep -ivE "$ex")
+fi
+[ -n "$pastpaths" ] && { echo "$pastpaths"; hit "home paths or IP addresses in past diffs"; }
 pasttokens=$(printf '%s\n' "$added" | grep -nIE 'gh[pousr]_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{22,}|AKIA[0-9A-Z]{16}|sk-ant-[A-Za-z0-9_-]{20,}|xox[abposr]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{35}|npm_[A-Za-z0-9]{36}|-----BEGIN [A-Z ]*PRIVATE KEY-----')
 [ -n "$pasttokens" ] && { echo "$pasttokens"; hit "token-shaped literals in past diffs"; }
 pastmails=$(printf '%s\n' "$added" | grep -nIE '[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}' |
