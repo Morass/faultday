@@ -42,6 +42,11 @@ public struct HourlyCount: Equatable {
     public var total: Int { crashes + installs }
 }
 
+public struct InstallHistoryResult {
+    public let events: [HistoryEvent]
+    public let skippedRows: Int
+}
+
 public enum HistorySeries {
     public static func emptyStateMessage(kinds: Set<EventKind>) -> String {
         kinds.isEmpty ? "Enable Crashes or Installs to see events." : "Choose another day or clear the hour filter."
@@ -123,7 +128,10 @@ public enum HistoryReader {
         if let installHistory {
             do {
                 let installs = try parseInstallHistory(installHistory)
-                events.append(contentsOf: installs)
+                events.append(contentsOf: installs.events)
+                if installs.skippedRows > 0 {
+                    warnings.append("Skipped \(installs.skippedRows) incomplete installation history entr\(installs.skippedRows == 1 ? "y" : "ies")")
+                }
                 sources.append(installHistory.path)
             } catch ParseError.tooLarge {
                 warnings.append("Installation history is too large to read")
@@ -147,13 +155,13 @@ public enum HistoryReader {
         guard let timestamp = object["timestamp"] as? String,
               let date = parseDate(timestamp) else { throw ParseError.malformed }
         let name = safeText((object["app_name"] as? String) ?? (object["name"] as? String) ?? "Unknown app")
-        let id = (object["incident_id"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? url.lastPathComponent
+        let id = (object["incident_id"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? url.path
         let version = safeText(object["app_version"] as? String ?? "")
         return HistoryEvent(id: "crash:\(id)", date: date, kind: .crash, title: name,
                             detail: version.isEmpty ? "App crash" : "App crash · version \(version)", source: "Diagnostic report", reportPath: url.path)
     }
 
-    public static func parseInstallHistory(_ url: URL) throws -> [HistoryEvent] {
+    public static func parseInstallHistory(_ url: URL) throws -> InstallHistoryResult {
         let properties = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
         guard properties.isRegularFile == true, properties.isSymbolicLink != true,
               let size = properties.fileSize else { throw ParseError.malformed }
@@ -161,13 +169,18 @@ public enum HistoryReader {
         let data = try Data(contentsOf: url, options: .mappedIfSafe)
         guard data.count <= 32_000_000 else { throw ParseError.tooLarge }
         guard let rows = try PropertyListSerialization.propertyList(from: data, format: nil) as? [[String: Any]] else { throw ParseError.malformed }
-        return rows.enumerated().compactMap { index, row in
-            guard let date = row["date"] as? Date, let name = row["displayName"] as? String else { return nil }
-            let version = safeText(row["displayVersion"] as? String ?? "")
+        var skippedRows = 0
+        let events = rows.enumerated().compactMap { index, row -> HistoryEvent? in
+            guard let date = row["date"] as? Date, let name = row["displayName"] as? String else {
+                skippedRows += 1
+                return nil
+            }
+            let version = safeText((row["displayVersion"] as? String) ?? (row["displayVersion"] as? NSNumber)?.stringValue ?? "")
             return HistoryEvent(id: "install:\(index)", date: date, kind: .install, title: safeText(name),
                                 detail: version.isEmpty ? "Software installed" : "Software installed · version \(version)",
                                 source: "Installation history")
         }
+        return InstallHistoryResult(events: events, skippedRows: skippedRows)
     }
 
     public static func defaultSources(environment: [String: String] = ProcessInfo.processInfo.environment) -> (reports: [URL], installs: URL?) {
