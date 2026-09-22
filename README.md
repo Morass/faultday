@@ -2,6 +2,8 @@
 
 Faultday shows your Mac's crash reports and Apple installation history on a calendar. Pick a day to see which apps crashed and which software was installed around then.
 
+![Faultday showing recorded game crashes on a calendar with an hourly activity graph](docs/screenshot.png)
+
 ## Install
 
 Requires macOS 14 or later and Swift 5.9 or later to build from source.
